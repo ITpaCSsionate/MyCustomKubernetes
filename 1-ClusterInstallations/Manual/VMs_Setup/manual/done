@@ -1,0 +1,259 @@
+Load the appropriate kernel modules 
+```
+sudo lsmod | grep kvm
+sudo modprobe kvm_intel 
+sudo modprobe kvm
+```
+
+# modprobe
+
+#Install the minimal setup of QEMU & KVM
+$ apt-get install qemu-system libvirt-clients libvirt-daemon-system
+
+#Install QEMU & KVM on a server without extra graphical packages
+$ apt-get install --no-install-recommends qemu-system libvirt-clients libvirt-daemon-system
+
+#Add your user to the libvirt group
+$ adduser <youruser> libvirt
+
+https://linuxconfig.org/how-to-create-and-manage-kvm-virtual-machines-from-cli
+
+sudo apt install qemu qemu-kvm libvirt-clients libvirt-daemon-system bridge-utils virt-manager
+modprobe kvm_intel
+sudo systemctl enable --now libvirtd
+Download ubuntu server
+Create virtual network with virsh:
+https://computingforgeeks.com/how-to-create-and-configure-bridge-networking-for-kvm-in-linux/
+https://linuxconfig.org/how-to-use-bridged-networking-with-libvirt-and-kvm
+https://wiki.debian.org/es/KVM
+
+pod IPs
+10.255.255.1/9 -> 10.255.255.1 netmask 255.128.0.0 (network 10.128.0.0/9)
+
+node ips (/24 por límite virsh)
+192.168.23.1/24 -> 192.168.23.1 netmask 255.255.0.0 (network 192.168.23.0/24)
+
+
+
+create the vnet:
+sudo virsh net-define vnet.xml
+sudo virsh net-list --all
+sudo virsh net-autostart k8s   
+ip route
+ip address
+
+sudo apt install libosinfo-bin
+osinfo-query os
+
+PROBLEMA: cómo implementar el lb de la api? :S 
+need meter una VM en la network con IP que no cambie OOO vm que tenga un hostname que el dns de la bridged network pueda resolver que me haga de LB de la API. 
+
+PROBLEMA: cómo implementar el bastion host? :S
+need meter una VM en la network para hacer ssh, y limitar el acceso de ssh de los hosts a la subnet. 
+
+Create volume for the VM:
+sudo apt-get install lvm2
+sudo fdisk /dev/sda, n, +200G, t 31, w
+
+TODO: hacerlo con volumenes lógicos para mostrar más skills
+man pvcreate
+man vgcreate
+man lvcreate
+man vgextend
+
+
+Create new folders for each storage. Create subpartitions LVMs inside the new partition for each storage and mount them and each subpartition is lvm ~~ discos de hosts q se pueden ampliar :).
+TODO: poner comandos de creación y modificación del /etc/fstab. Hay otras opciones (https://libvirt.org/storage.html) y la de lvm creada en el host + lvm de libvirt es interesante, pero lo más parecido a una setup real es lo escogido... 
+Create new partition of 200GiB and mount it in /var/vm_storages
+sudo mount -a
+
+TODO: conseguirlo creando volumenes con virsh...
+
+<volume>
+  <name>test.qcow2</name>
+  <capacity>21474836480</capacity>
+  <allocation>0</allocation>
+  <target>
+    <format type="qcow2"/>
+  </target>
+</volume>
+
+
+Create storage pool (https://libvirt.org/storage.html). This lets you create volumes later to be assigned to the VM
+virsh pool-define poolDefinition.xml
+virsh pool-start k8spool
+virsh pool-autostart k8spool
+ 
+Create volumes 
+virsh vol-create k8spool master0vol --20G --format qcow2
+
+DONE: 
+sudo qemu-img create -f qcow2 -o preallocation=full master0 20G
+sudo qemu-img create -f qcow2 -o preallocation=full lbVM 10G
+sudo qemu-img create -f qcow2 -o preallocation=full worker0 20G
+sudo qemu-img create -f qcow2 -o preallocation=full worker1 20G
+
+
+Create VMs:
+virt-install --name lbVM --memory 1024 --vcpus 1 --cdrom ~/Downloads/ubuntu-22.04-live-server-amd64.iso --disk size=10 --os-variant ubuntu20.04
+virt-install --name masterVM --memory 4096 --vcpus 4 --cdrom ~/Downloads/ubuntu-22.04-live-server-amd64.iso size=10 --os-variant ubuntu20.04
+virt-install --name worker1 --memory 2048 --vcpus 2 --cdrom ~/Downloads/ubuntu-22.04-live-server-amd64.iso --disk size=10 --os-variant ubuntu20.04
+virt-install --name worker2 --memory 2048 --vcpus 2 --cdrom ~/Downloads/ubuntu-22.04-live-server-amd64.iso --disk size=10 --os-variant ubuntu20.04
+
+
+SHOULD WORK:
+virt-install \
+--name ctest1 \
+--ram 1024 \
+--disk pool=default,size=20,bus=virtio,format=qcow2 \
+--vcpus 1 \
+--os-type linux \
+--os-variant ubuntu16.04 \
+--network network:default \
+--graphics none \
+--console pty,target_type=serial \
+--location 'http://gb.archive.ubuntu.com/ubuntu/dists/xenial/main/installer-amd64/' \
+--extra-args 'console=ttyS0,115200n8 serial' \
+ --force --debug
+
+
+Create VMS (cli):
+
+PROBLEMA: need montar el .iso pq si no no workea pq no encuentra files (https://askubuntu.com/questions/1116383/couldnt-find-hvm-kernel-for-ubuntu-tree)
+
+
+SHOULD WORK:
+virt-install --name lbVM --memory 1024 --vcpus 1 --location https://us.archive.ubuntu.com/ubuntu/dists/wily/main/installer-amd64/ --disk size=10 --os-type linux --network k8s --graphics none --console pty,target_type=serial --extra-args="console=ttyS0" --force --debug  
+
+
+mount -o ro /images/ubuntu-20.04-live-server-amd64.iso /mnt
+virt-install --name lbVM --memory 1024 --vcpus 1 --location /mnt --disk size=10 --os-type linux --os-variant ubuntu20.04 --network k8s --graphics none --console pty,target_type=serial --extra-args="console=ttyS0" --force --debug  --boot kernel=casper/vmlinuz,initrd=casper/initrd,kernel_args="console=ttyS0"
+
+TOTEST:
+mount -o ro /images/ubuntu-20.04-live-server-amd64.iso /mnt
+virt-install --name lbVM --memory 1024 --vcpus 1 --location /mnt --disk size=10 --os-type linux --os-variant ubuntu20.04 --network k8s --graphics none --console pty,target_type=serial --extra-args="console=ttyS0" --force --debug  --boot kernel=casper/vmlinuz,initrd=casper/initrd,kernel_args="console=ttyS0"
+
+TOTEST2:
+virt-install --name lbVM --memory 2048 --vcpus 1 --location ~/Downloads/ubuntu-22.04-live-server-amd64.iso,kernel=casper/vmlinuz,initrd=casper/initrd,kernel_args="console=ttyS0" --disk /var/vm_storages/lbVM --os-type linux --os-variant ubuntu20.04 --network k8s --graphics none --console pty,target_type=serial --extra-args="console=ttyS0" --force --debug
+
+
+https://www.kernel.org/doc/html/v4.15/admin-guide/serial-console.html
+
+
+HERE <-
+need download img y avanzar... parece q ya tengo disk y network... 
+TODO: crear una tty serie e instalar pro ahí??
+
+https://cloud-images.ubuntu.com/
+search ubuntu 18.04 bionic and download amd64 .img
+https://medium.com/@art.vasilyev/use-ubuntu-cloud-image-with-kvm-1f28c19f82f8
+
+virt-install --name lbVM --memory 2048 --vcpus 1 --location ~/Downloads/bionic-server-cloudimg-amd64.img --disk /var/vm_storages/lbVM --os-type linux --os-variant ubuntu20.04 --network k8s --graphics none --console pty,target_type=serial --extra-args="console=ttyS30,115200" --force --debug
+
+
+virt-install --name lbVM --memory 2048 --vcpus 1 --location ~/Downloads/ubuntu-22.04-live-server-amd64.iso --disk /var/vm_storages/lbVM --os-type linux --os-variant ubuntu20.04 --network k8s --force --debug
+
+
+INSTALL WORKED:
+NETWORK WORKEÓ TRIVIAL,
+VOLUMENES NEED PROBAR:
+<disk type="file" device="disk">
+  <driver name="qemu" type="qcow2"/>
+  <source file="/var/vm_storages/worker0" index="2"/>
+  <backingStore/>
+  <target dev="vda" bus="virtio"/>
+  <alias name="virtio-disk0"/>
+  <address type="pci" domain="0x0000" bus="0x03" slot="0x00" function="0x0"/>
+</disk>
+
+
+PERO WORKEO CON:
+sudo qemu-img create -f qcow2 master0 20G
+sudo qemu-img create -f qcow2 -o preallocation=full lbVM 10G
+sudo qemu-img create -f qcow2 worker0 20G
+sudo qemu-img create -f qcow2 worker1 20G
+
+WORKS PERO ES GRÁFICO EL INSTALL:
+virt-install --name lbVM --memory 2048 --vcpus 1 --cdrom ~/Downloads/ubuntu-22.04-live-server-amd64.iso --disk /var/vm_storages/lbVM --os-type linux --os-variant ubuntu20.04 --network network=k8s --force --debug
+virt-install --name master0 --memory 4096 --vcpus 4 --cdrom ~/Downloads/ubuntu-22.04-live-server-amd64.iso --disk /var/vm_storages/master0 --os-type linux --os-variant ubuntu20.04 --network network=k8s --force --debug
+virt-install --name worker0 --memory 2048 --vcpus 2 --cdrom ~/Downloads/ubuntu-22.04-live-server-amd64.iso --disk /var/vm_storages/worker0 --os-type linux --os-variant ubuntu20.04 --network network=k8s --force --debug
+virt-install --name worker1 --memory 2048 --vcpus 2 --cdrom ~/Downloads/ubuntu-22.04-live-server-amd64.iso --disk /var/vm_storages/worker1 --os-type linux --os-variant ubuntu20.04 --network network=k8s --force --debug
+
+
+TODO: NEED QUE SEA DESATENDIDO... Y NO GRÁFICO.. :S
+https://serverfault.com/questions/627238/kvm-libvirt-how-to-configure-static-guest-ip-addresses-on-the-virtualisation-ho
+
+TODO: need probar 
+virt-install --name lbVM --memory 2048 --vcpus 1 --cdrom ~/Downloads/ubuntu-22.04-live-server-amd64.iso --disk /var/vm_storages/lbVM --os-type linux --os-variant ubuntu20.04 --network network=k8s --force --debug --graphics vnc,port=5900 
+PARA VER si puedo conectarme con VNC con un cliente que no sea virt-manager... (curiosidad)
+
+
+
+Disable swap
+--> entrar a la vm y hacer swapoff 
+swapoff --all
+vim /etc/fstab Y remover las entradas de swap si las hay
+
+
+virsh dumpxml master0
+virsh dumpxml worker0
+virsh dumpxml worker1
+
+
+virsh net-edit --network k8s and add in the <dhcp> section: (i obtained these macs from virsh dumpxml <vmname> as it is the mac address of the vm)
+  <host mac='52:54:00:28:1a:d1' name='master0' ip='192.168.23.5'/>
+  <host mac='52:54:00:7a:06:b7' name='worker0' ip='192.168.23.20'/>
+  <host mac='52:54:00:55:73:91' name='worker1' ip='192.168.23.21'/>
+  
+virsh net-dumpxml --network k8s > netBackup.xml
+virsh net-destroy k8s
+virsh net-start k8s
+virsh net-list
+
+
+
+AHORA Need Poner ssh key en las VMs: 
+
+ed25519 ECC ya que es más rápido que RSA y es gratis usarlo:
+ssh-keygen -t ed25519 -C "" -f VMsKey
+
+instalar openssh
+sudo apt install openssh-server openssl
+sudo systemctl enable ssh
+
+Desde el host desde el que generamos la key:
+ssh-copy-id -i VMsKey master0@192.168.23.5
+ssh-copy-id -i VMsKey worker0@192.168.23.20
+ssh-copy-id -i VMsKey worker1@192.168.23.21
+
+
+Test it:
+ssh -i VMsKey master0@192.168.23.5
+ssh -i VMsKey worker0@192.168.23.20
+ssh -i VMsKey worker1@192.168.23.21
+
+ENDDDDDED!!!!!!!!!!!!!! :D trivial!
+
+
+
+
+
+
+en el host: tcpdump -ni k8s icmp Y VEMOS QUE HAY CONECTIVIDAD PQ LA NET TE CREA UNA IFACE EN HOST EN LA SUBNET DE GUESTS :) (PRIMERAS 7 LÍNEAS DE notasMias)
+
+Por lo que para hacer de LB podemos correr un HAProxy en el host (o crear otra VM en la guest SubNet) que tenga la ip del master y ya ggwp OO en el /etc/hosts
+
+
+
+
+
+
+virsh destroy lbVM && virsh undefine lbVM
+
+
+virsh console <vm>
+virsh start <vm>
+virsh stop <vm>
+virsh destroy <vm> + virsh undefine <vm>
+
+

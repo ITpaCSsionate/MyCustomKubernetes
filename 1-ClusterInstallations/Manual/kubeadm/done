@@ -1,0 +1,181 @@
+https://kubernetes.io/docs/reference/setup-tools/kubeadm/
+
+
+TODO: crearme .iso con el sistema base YY la ssh key dentro (ES LA MAESTRA y después el instalador genera otra ssh-key y la mete usando la maestra, y después borra la maestra) y el openssh enabled, nettools. Que sea automático el install y el setup de la key creada nueva seria guapíisimo :D OOO que tenga kubelet y tal ya instalado y los modulos enabled
+
+SSH CONFIG TIENE Q DENEGAR USERS Y TAL:
+Port 22445
+PermitRootLogin no
+LoginGraceTime 30
+MaxAuthTries 3
+MaxStartups 3
+AllowUsers sergio sergio2
+DenyUsers adrian adrian2
+
+
+
+TODO: hacer un cluster upgrade :D 
+
+
+
+Assuming you have 1 master and 2 workers VMS setup. 
+
+Start the VMs:
+virsh list --all
+virsh start master0
+virsh start worker0
+virsh start worker1
+
+Get the ips if you have forgotten them
+virsh net-list
+virsh net-dhcp-leases --network k8s
+
+
+TMux create a session for each vm -> https://tmuxcheatsheet.com/
+ctrl+b +o moverse entre paneles
+ctrl+b+ leftarrow para el sizing
+ctrlb + % (shift+5) -> new panel horizontal
+ctrlb + " (shift2) -> new panel vertical
+exit -> kill panel XD
+ctrlb + & -> kill tmux
+
+ctrlb+, -> rename window
+ctrlb+; ir al panel previo
+
+
+SSh into the VMs
+
+
+Install a container runtime and configure the host accordingly (https://kubernetes.io/docs/setup/production-environment/container-runtimes/) in this case CRI-O as I am used to work with it (OpenShift uses CRI-O, and I am used to work with crictl for low-level debugging...)
+lsmod | grep br_netfilter
+sudo modprobe br_netfilter
+cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
+overlay
+br_netfilter
+EOF
+cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-iptables  = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward                 = 1
+EOF
+sudo sysctl --system
+
+
+--> /etc/modules-load.d/ módulos a cargar en boot
+--> /etc/systemd --> servicios a cargar en boot time
+
+Check la versión de cgroup 
+TODO: explicar qué son los namespaces y los control groups
+grep cgroup /proc/filesystems
+
+
+
+En ubuntu sv soporta la v2. Ver si systemd la usa:
+systemd --version 
+muestra que la jerarquía es unificada, por lo que en ubuntu sv no need tocar nada para usar v2 de cgroups.
+
+En caso de que no la use, añadir en la línea GRUB_CMDLINE_LINUX en /etc/default/grub (https://unix.stackexchange.com/questions/471476/how-do-i-check-cgroup-v2-is-installed-on-my-machine)
+systemd.unified_cgroup_hierarchy=1
+
+
+Ahora need instalar el container runtime. Cogido CRIO:
+https://github.com/cri-o/cri-o/blob/main/install.md#apt-based-operating-systems
+
+
+((https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/1.23/xUbuntu_20.04/))
+
+
+sudo apt update
+sudo apt install -y curl gnupg libseccomp-dev
+
+sudo su
+
+export OS=xUbuntu_20.04
+echo $OS
+export VERSION=1.23
+echo $VERSION
+
+echo "deb [signed-by=/usr/share/keyrings/libcontainers-archive-keyring.gpg] https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$OS/ /" > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list
+echo "deb [signed-by=/usr/share/keyrings/libcontainers-crio-archive-keyring.gpg] https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/$VERSION/$OS/ /" > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable:cri-o:$VERSION.list
+
+mkdir -p /usr/share/keyrings
+curl -L https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$OS/Release.key | gpg --dearmor -o /usr/share/keyrings/libcontainers-archive-keyring.gpg
+curl -L https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/$VERSION/$OS/Release.key | gpg --dearmor -o /usr/share/keyrings/libcontainers-crio-archive-keyring.gpg
+
+apt-get update
+apt-get install -y cri-o cri-o-runc
+
+sudo systemctl daemon-reload
+sudo systemctl enable crio
+sudo systemctl start crio
+
+
+
+
+Execute the provided commands by Kubernetes  to get KubeAdm (https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/):
+sudo apt-get update
+sudo apt-get install -y apt-transport-https ca-certificates curl
+sudo curl -fsSLo /usr/share/keyrings/kubernetes-archive-keyring.gpg https://packages.cloud.google.com/apt/doc/apt-key.gpg
+echo "deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+sudo apt-get update
+sudo apt-get install -y kubelet kubeadm kubectl
+sudo apt-mark hold kubelet kubeadm kubectl
+
+
+
+
+Install the cluster(https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/):
+
+TODO: install con un Load Balancer para poner --control-plane-endpoint al instalar y así tener HA. Este install es single master...
+https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/#considerations-about-apiserver-advertise-address-and-controlplaneendpoint
+
+TODO: Probar un cluster con kubespray
+
+TODO: single-node install y taint el master: kubectl taint nodes --all node-role.kubernetes.io/control-plane- node-role.kubernetes.io/master- para poder poner pods ahí..
+
+TODO: probar un cluster IPv6 a ver... ?
+TODO: kubeadm config??? WOW? un configmap persistido... MEGUZTA?
+
+Como le quiero meter el CNI Calico, miré si Calico nita algún argumento al hacer kubeadm init:
+
+sudo kubeadm init --pod-network-cidr=10.23.0.0/16 --cri-socket unix:///var/run/crio/crio.sock --apiserver-advertise-address 192.168.23.5 2> installationErrs.log 1> installationLogs.log 
+
+
+If errors -> 
+sudo kubeadm reset 
+sudo rm -rf /etc/cni/net.d 
+sudo rm $HOME/.kube/config
+sudo iptables --flush
+
+
+
+Postinstall:
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+OO export KUBECONFIG=/etc/kubernetes/admin.conf como root
+
+
+Meter CNI Calico:
+kubectl create -f https://projectcalico.docs.tigera.io/manifests/tigera-operator.yaml
+wget https://projectcalico.docs.tigera.io/manifests/custom-resources.yaml -O calico-cr.yaml
+kubectl create -f calico-cr.yaml
+
+Restart crio en todos los nodos
+systemctl restart crio
+
+
+Meter los workers :)
+
+kubeadm join 192.168.23.5:6443 --token c0xp5y.77022swkuhdttiqf --discovery-token-ca-cert-hash sha256:e662d41f96ccb6623b3ea032672ad43b985618295841421a08e58135a4607e3c
+kubeadm join 192.168.23.5:6443 --token c0xp5y.77022swkuhdttiqf --discovery-token-ca-cert-hash sha256:e662d41f96ccb6623b3ea032672ad43b985618295841421a08e58135a4607e3c --v=7
+
+kubectl label node worker1 node-role.kubernetes.io/worker=worker
+kubectl label node worker0 node-role.kubernetes.io/worker=worker
+
+
+ENDDDDDD TRIVIAL
+			
+Restart crio en todos los nodos
+systemctl restart crio

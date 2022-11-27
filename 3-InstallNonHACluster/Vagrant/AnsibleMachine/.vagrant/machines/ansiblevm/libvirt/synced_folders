@@ -1,0 +1,1 @@
+{"rsync":{"/mnt/kubespray":{"type":"rsync","guestpath":"/mnt/kubespray","hostpath":"/home/kubernetesfan/Desktop/Steps/3-InstallNonHACluster/Vagrant/AnsibleMachine/kubespray","disabled":false,"__vagrantfile":true,"owner":"vagrant","group":"vagrant"}}}

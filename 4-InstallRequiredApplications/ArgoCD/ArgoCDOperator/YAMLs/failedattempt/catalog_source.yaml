@@ -1,0 +1,10 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: myargocdoperator-catalog
+  namespace: olm
+spec:
+  sourceType: grpc
+  image: itpacssionate/local-kubernetes-images:argocd-operator-catalogsource
+  displayName: MyArgoCDOperator
+  publisher: Custom

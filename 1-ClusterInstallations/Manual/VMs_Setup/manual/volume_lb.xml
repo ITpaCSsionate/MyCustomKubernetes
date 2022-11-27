@@ -1,0 +1,19 @@
+<volume type='file'>
+  <name>lbVM</name>
+  <key>/var/vm_storages/lbVM</key>
+  <source>
+  </source>
+  <capacity unit='bytes'>21474836480</capacity>
+  <allocation unit='bytes'>3844022272</allocation>
+  <target>
+    <path>/var/vm_storages/lbVM</path>
+    <format type='qcow2'/>
+    <permissions>
+      <mode>0644</mode>
+      <owner>64055</owner>
+      <group>108</group>
+    </permissions>
+    <compat>1.1</compat>
+    <features/>
+  </target>
+</volume>

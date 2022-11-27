@@ -1,0 +1,17 @@
+<network>
+  <name>k8s</name>
+  <uuid>6015c571-104f-47cf-afc2-a7215c678f02</uuid>
+  <forward mode='nat'>
+    <nat>
+      <port start='1024' end='65535'/>
+    </nat>
+  </forward>
+  <bridge name='k8s' stp='on' delay='0'/>
+  <mac address='52:54:00:cf:da:0c'/>
+  <ip address='192.168.23.1' netmask='255.255.255.0'>
+    <dhcp>
+      <range start='192.168.23.2' end='192.168.23.254'/>
+    </dhcp>
+  </ip>
+</network>
+

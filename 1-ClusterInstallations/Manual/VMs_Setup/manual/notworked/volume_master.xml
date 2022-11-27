@@ -1,0 +1,12 @@
+<volume type="qcow2">
+​  <name>master0</name>
+​  <allocation>0</allocation>
+​  <capacity unit="G">20</capacity>
+​  <target>
+​    <path>/var/vm_storages/master0</path>
+​    <permissions>
+​      <mode>0744</mode>
+​      <label>master0</label>
+​    </permissions>
+​  </target>
+​</volume>

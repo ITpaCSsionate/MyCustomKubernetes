@@ -1,0 +1,12 @@
+<volume>
+​  <name>worker1</name>
+​  <allocation>0</allocation>
+​  <capacity unit="G">20</capacity>
+​  <target>
+​    <path>/var/vm_storages/worker1</path>
+​    <permissions>
+​      <mode>0744</mode>
+​      <label>worker1</label>
+​    </permissions>
+​  </target>
+​</volume>

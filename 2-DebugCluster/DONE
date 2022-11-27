@@ -1,0 +1,68 @@
+after the cluster was installed and running, when I was trying to use it:
+```
+kubernetesfan@kubePC:~/Desktop/Steps/2-DebugCluster$ kubectl get nodes
+Unable to connect to the server: net/http: TLS handshake timeout
+```
+after sshing to a master node:
+apiserver was being restarted:
+```
+[root@node1 ~]# crictl ps -a | grep kube-apiserv
+23f5da7d9eac7       d521dd763e2e3       4 minutes ago        Running             kube-apiserver            13                  b52bdfd1187aa       kube-apiserver-node1
+eef098e51bad9       d521dd763e2e3       10 minutes ago       Exited              kube-apiserver            12                  b52bdfd1187aa       kube-apiserver-node1
+```
+
+then I checked the logs and:
+```
+W0823 18:48:18.649401       1 clientconn.go:1331] [core] grpc: addrConn.createTransport failed to connect to {192.168.230.4:2379 192.168.230.4 <nil> 0 <nil>}. Err: connection error: desc = "transport: Error while dialing dial tcp 192.168.230.4:2379: i/o timeout". Reconnecting...
+W0823 18:48:19.992783       1 reflector.go:442] vendor/k8s.io/client-go/informers/factory.go:134: watch of *v1.RuntimeClass ended with: an error on the server ("unable to decode an event from the watch stream: http2: client connection lost") has prevented the request from succeeding
+```
+
+also checked etcd members:
+```
+[root@node1 ~]# etcdctl --endpoints=https://192.168.230.3:2379,https://192.168.230.4:2379,https://192.168.230.5:2379 member list
+{"level":"warn","ts":"2022-08-23T18:49:02.398Z","logger":"etcd-client","caller":"v3/retry_interceptor.go:62","msg":"retrying of unary invoker failed","target":"etcd-endpoints://0xc0002e2a80/192.168.230.3:2379","attempt":0,"error":"rpc error: code = DeadlineExceeded desc = latest balancer error: last connection error: connection error: desc = \"transport: authentication handshake failed: remote error: tls: bad certificate\""}
+Error: context deadline exceeded
+```
+
+at first I thought it could be a certificate issue:
+```
+[root@node1 ~]# openssl s_client -connect 192.168.230.3:2379  | openssl x509 -noout -dates
+Can't use SSL_get_servername
+depth=1 CN = etcd-ca
+verify return:1
+depth=0 CN = etcd-member-node1
+verify return:1
+140621938071360:error:14094412:SSL routines:ssl3_read_bytes:sslv3 alert bad certificate:ssl/record/rec_layer_s3.c:1543:SSL alert number 42
+notBefore=Aug 21 19:17:37 2022 GMT
+notAfter=Jul 28 19:17:37 2122 GMT
+```
+
+then:
+```
+etcdctl --endpoints=https://192.168.230.3:2379,https://192.168.230.4:2379,https://192.168.230.5:2379 --cacert /etc/ssl/etcd/ssl/ca.pem --cert /etc/ssl/etcd/ssl/node-node1.pem --key /etc/ssl/etcd/ssl/node-node1-key.pem member list -w table
+etcdctl --endpoints=https://192.168.230.3:2379,https://192.168.230.4:2379,https://192.168.230.5:2379  --cacert /etc/ssl/etcd/ssl/ca.pem --cert /etc/ssl/etcd/ssl/node-node1.pem --key /etc/ssl/etcd/ssl/node-node1-key.pem endpoint status -w table
+etcdctl --endpoints=https://192.168.230.3:2379,https://192.168.230.4:2379,https://192.168.230.5:2379 --cacert /etc/ssl/etcd/ssl/ca.pem --cert /etc/ssl/etcd/ssl/node-node1.pem --key /etc/ssl/etcd/ssl/node-node1-key.pem defrag
+```
+
+After defrag, etcd started working again... it makes no sense... 
+after having a look at the nodes, I saw a lot of CPU usage on the node I was using as the APIserver node (no LB at this time). Nearly 95% SYS cpu in top, which could explain etcd problems (not enough cpu -> everything is slower -> etcd cannot make things on time -> the entire cluster has issues)
+
+After checking another masters' node status of etcd service:
+```
+ time; took too long, leader is overloaded likely from slow disk","to":"f1b492e>
+```
+
+Then I checked who the leader was, and iotop of that node showed a lot of reads from disk.
+
+Then, once I remembered that I provisioned the storage of the VMs into an HDD disk, everything made sense... etcd requires SSD disks as everything needs to go to disk for maintaining the state.
+
+So I checked etcd doc, and used fio to test disk performance (yum install -y fio)
+```
+fio --minimal --thread --exitall_on_error --runtime=1s --name=nulltest --ioengine=null --rw=randrw --iodepth=2 --norandommap --random_generator=tausworthe64 --size=16T --name=verifyfstest --filename=fiotestfile.tmp --unlink=1 --rw=write --verify=crc32c --verify_state_save=0 --size=16K
+fio --name=randwrite --ioengine=libaio --iodepth=1 --rw=randwrite --bs=4k --direct=0 --size=512M --numjobs=2 --runtime=240 --group_reporting
+
+Storage path of etcd: /var/lib/etcd/member
+sudo fio --filename=/var/lib/etcd/member --size=5GB --direct=1 --rw=randrw --bs=4k --ioengine=libaio --iodepth=256 --runtime=120 --numjobs=4 --time_based --group_reporting --name=iops-test-job --eta-newline=1
+```
+
+But it was being killed (the node had no memory left...). So the solution was almost clear: give the master nodes more resources and a better disk. That should solve those etcd issues

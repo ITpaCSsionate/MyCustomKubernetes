@@ -1,0 +1,11 @@
+--2022-11-13 13:01:10--  https://storage.googleapis.com/tekton-releases/triggers/latest/interceptors.yaml
+Resolving storage.googleapis.com (storage.googleapis.com)... 142.250.178.176, 216.58.215.176, 216.58.215.144, ...
+Connecting to storage.googleapis.com (storage.googleapis.com)|142.250.178.176|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 6812 (6,7K) [application/octet-stream]
+Saving to: ‘interceptors.yaml.1’
+
+     0K ......                                                100% 5,39M=0,001s
+
+2022-11-13 13:01:10 (5,39 MB/s) - ‘interceptors.yaml.1’ saved [6812/6812]
+

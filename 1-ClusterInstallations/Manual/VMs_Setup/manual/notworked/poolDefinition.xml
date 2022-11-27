@@ -1,0 +1,6 @@
+<pool type="dir">
+  <name>k8spool</name>
+  <target>
+    <path>/var/vm_storages</path>
+  </target>
+</pool>

@@ -1,0 +1,9 @@
+apiVersion: v1
+data:
+  size: 10GiB
+  storageClassName: nfs-client
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  name: config-artifact-pvc
+  namespace: tekton-pipelines

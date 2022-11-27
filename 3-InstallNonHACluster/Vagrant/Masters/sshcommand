@@ -1,0 +1,2 @@
+ssh-keygen -R 192.168.230.3
+ssh -i mastersKey root@192.168.230.3

@@ -1,0 +1,10 @@
+el network create te pone una interfaz del host en la vnet creada (la primera ip), por lo que esa interfaz hace de gw de la vnet creada para los nodos.
+
+Por eso es ~~ como un bastion... 
+
+el lb entonces cómo meterlo? 
+
+OSTÍA TAMBIÉN TE CREA RUTAS PARA LLEGAR A LOS HOSTS, POR LO QUE DESDE EL HOST SI VAS AL RANGO DE IPS DEL GUEST HACE FORWARD LA NET. ES NAT ES LA POLLÍSIMA!
+
+
+

@@ -1,0 +1,31 @@
+install ansible
+https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html#installation-guide
+
+
+
+
+## start by installing vagrant libvirt requirements
+sudo apt install qemu libvirt-daemon-system libvirt-clients libxslt-dev libxml2-dev libvirt-dev zlib1g-dev ruby-dev ruby-libvirt ebtables dnsmasq-base
+curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+
+sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+
+sudo apt-get update && sudo apt-get install vagrant
+
+sudo apt-get install qemu-utils libvirt-dev ruby-dev
+
+vagrant plugin install vagrant-libvirt
+> Not needed: vagrant plugin install vagrant-mutate
+
+> vagrant init ubuntu/focal64
+> Ideally we would use libvirt as a provider, but ubuntu/focal64 does not support it. 
+
+
+
+## Create the VMs
+> Reference: https://github.com/vagrant-libvirt/vagrant-libvirt
+export VAGRANT_DEFAULT_PROVIDER=libvirt
+vagrant up
+echo -n $'\n\n' | ssh-keygen -b 4092 -t ed25519 -f mastersKey 
+
+
