@@ -1,6 +1,6 @@
 # My Custom Kubernetes
 ## What is this?
-I am a Kubernetes fan. I worked with OpenShift for approximately a year and a half, and it allowed me to learn both OpenShift and Kubernetes. 
+I am a Kubernetes fan. I intensely worked with OpenShift for more than a year and a half (1 year and 8 months to be precise) in a team whose focus was to provide as much value sa the company with OpenShift as possible. It allowed me to learn both OpenShift and Kubernetes in a deep level (how the platforms work, the components, what happen inside the platform, associated technologies, etc.) 
 
 So, I had some spare time and I explored setting up a local kubernetes cluster using Libvirt + kubeadm (all by hand), and then using Vagrant (with Libvirt provider) and Kubespray. 
 
